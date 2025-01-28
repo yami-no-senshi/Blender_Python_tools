@@ -4,6 +4,8 @@ from mathutils import Vector
 
 # https://atu-1.gitbooks.io/mirror-introduction/content/body/chapter_03/09_Use_Coordinate_Transformation_2.html
 # https://blender.stackexchange.com/questions/284222/get-view-and-perspective-matrices-of-the-current-3d-viewport-not-camera
+# https://blender.stackexchange.com/questions/16472/how-can-i-get-the-cameras-projection-matrix/50507#50507
+
 def delete_all():
 #  for item in bpy.context.scene.objects:
 #    bpy.context.scene.objects.unlink(item)
@@ -60,6 +62,56 @@ def get_region_and_space(area_type, region_type, space_type):
     return (area, region, space)
 
 
+
+def project_3d_point(camera: bpy.types.Object,
+                     p: Vector,
+                     render: bpy.types.RenderSettings = bpy.context.scene.render) -> Vector:
+    """
+    Given a camera and its projection matrix M;
+    given p, a 3d point to project:
+
+    Compute P’ = M * P
+    P’= (x’, y’, z’, w')
+
+    Ignore z'
+    Normalize in:
+    x’’ = x’ / w’
+    y’’ = y’ / w’
+
+    x’’ is the screen coordinate in normalised range -1 (left) +1 (right)
+    y’’ is the screen coordinate in  normalised range -1 (bottom) +1 (top)
+
+    :param camera: The camera for which we want the projection
+    :param p: The 3D point to project
+    :param render: The render settings associated to the scene.
+    :return: The 2D projected point in normalized range [-1, 1] (left to right, bottom to top)
+    """
+
+    if camera.type != 'CAMERA':
+        raise Exception("Object {} is not a camera.".format(camera.name))
+
+    if len(p) != 3:
+        raise Exception("Vector {} is not three-dimensional".format(p))
+
+    # Get the two components to calculate M
+    modelview_matrix = camera.matrix_world.inverted()
+    projection_matrix = camera.calc_matrix_camera(
+        bpy.data.scenes["Scene"].view_layers["ViewLayer"].depsgraph,
+        x = render.resolution_x,
+        y = render.resolution_y,
+        scale_x = render.pixel_aspect_x,
+        scale_y = render.pixel_aspect_y,
+    )
+
+    # print(projection_matrix * modelview_matrix)
+
+    # Compute P’ = M * P
+    p1 = projection_matrix @ modelview_matrix @ Vector((p.x, p.y, p.z, 1))
+
+    # Normalize in: x’’ = x’ / w’, y’’ = y’ / w’
+    p2 = Vector(((p1.x/p1.w, p1.y/p1.w)))
+
+    return p2
 
 if __name__ == "__main__":
   delete_all()
@@ -170,3 +222,36 @@ if __name__ == "__main__":
       print("global: " + repr(g))
       print("perspective: " + repr(p))
       print("region: " + repr(r))
+
+
+
+  print("=====================")
+  camera = bpy.data.objects['Camera']  # or bpy.context.active_object
+  render = bpy.context.scene.render
+
+  Averts = [Vector((0,0,0)), \
+            Vector((0,5,3)), \
+            Vector((5,5,0)), \
+            Vector((5,0,0)), \
+            Vector((0,0,5)), \
+            Vector((0,5,5)), \
+            Vector((5,5,5)), \
+            Vector((5,0,5))]
+  for P in Averts:
+    print(P)
+    #P = Vector((-0.002170146, 0.409979939, 0.162410125))
+
+    print("Projecting point {} for camera '{:s}' into resolution {:d}x{:d}..."
+        .format(P, camera.name, render.resolution_x, render.resolution_y))
+
+    proj_p = project_3d_point(camera=camera, p=P, render=render)
+    print("Projected point (homogeneous coords): {}.".format(proj_p))
+
+    proj_p_pixels = Vector(((render.resolution_x-1) * (proj_p.x + 1) / 2, (render.resolution_y - 1) * (proj_p.y - 1) / (-2)))
+    print("Projected point (pixel coords): {}.".format(proj_p_pixels))
+
+  print("Done.")
+
+  bpy.context.scene.render.image_settings.file_format = 'PNG'
+  bpy.ops.render.render()
+  bpy.data.images['Render Result'].save_render( filepath = 'hoge.png')
