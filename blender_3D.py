@@ -19,32 +19,6 @@ def delete_all():
   for item in bpy.data.materials:
     bpy.data.materials.remove(item)
 
-# 指定したエリア、リージョン、スペースを取得する関数
-def get_region_and_space(area_type, region_type, space_type):
-    region = None
-    area = None
-    space = None
-
-    # 指定されたエリアを取得する
-    for a in bpy.context.screen.areas:
-        if a.type == area_type:
-            area = a
-            break
-    else:
-        return (None, None, None)
-    # 指定されたリージョンを取得する
-    for r in area.regions:
-        if r.type == region_type:
-            region = r
-            break
-    # 指定されたスペースを取得する
-    for s in area.spaces:
-        if s.type == space_type:
-            space = s
-            break
-
-    return (area, region, space)
-
 def project_3d_point(camera: bpy.types.Object,
                      p: Vector,
                      render: bpy.types.RenderSettings = bpy.context.scene.render) -> Vector:
@@ -96,7 +70,63 @@ def project_3d_point(camera: bpy.types.Object,
     return p2
 
 
-def main():
+def get_2D_LeftTopRightBottom(obj):
+
+  # 選択中の頂点のローカル座標を取得する
+  bm = bmesh.from_edit_mesh(obj.data)
+  vert_local = [
+    Vector((v.co[0], v.co[1], v.co[2], 1.0))
+    for v in bm.verts if v.select
+  ]
+  # ローカル座標からグローバル座標への変換
+  vert_global = [obj.matrix_world @ v for v in vert_local]
+
+  # 3次元座標のベクター形式に変換
+  vs = [
+    Vector((v[0], v[1], v[2]))
+    for v in vert_global
+  ]
+
+  camera = bpy.data.objects['Camera']  # or bpy.context.active_object
+  render = bpy.context.scene.render
+
+  Left   = render.resolution_x-1
+  Top    = render.resolution_y-1
+  Right  = 0
+  Bottom = 0
+
+  for P in vs:
+#    print("Projecting point {} for camera '{:s}' into resolution {:d}x{:d}..."
+#        .format(P, camera.name, render.resolution_x, render.resolution_y))
+
+    proj_p = project_3d_point(camera=camera, p=P, render=render)
+#    print("Projected point (homogeneous coords): {}.".format(proj_p))
+
+    proj_p_pixels = Vector(((render.resolution_x-1) * (proj_p.x + 1) / 2, (render.resolution_y - 1) * (proj_p.y - 1) / (-2)))
+#    print("Projected point (pixel coords): {}.".format(proj_p_pixels))
+
+    Left   = min(Left,   proj_p_pixels.x)
+    Top    = min(Top,    proj_p_pixels.y)
+    Right  = max(Right,  proj_p_pixels.x)
+    Bottom = max(Bottom, proj_p_pixels.y)
+
+
+  Left   = min(Left,   render.resolution_x-1)
+  Top    = min(Top,    render.resolution_y-1)
+  Right  = min(Right,  render.resolution_x-1)
+  Bottom = min(Bottom, render.resolution_y-1)
+
+  print("(", Left,  ",",  Top, ")")
+  print("(", Right, ",",  Top, ")")
+  print("(", Left,  ",",  Bottom, ")")
+  print("(", Right, ",",  Bottom, ")")
+
+  print("Done.")
+
+
+if __name__ == "__main__":
+  delete_all()
+
 
   # 
   Target_Mesh_Name = 'Cube_Mesh'
@@ -146,58 +176,8 @@ def main():
 
   bpy.ops.object.mode_set(mode="EDIT", toggle=False)
 
-  # 3Dビューエリアのウィンドウリージョンのリージョンとスペースを取得
-  (_, region, space) = get_region_and_space('VIEW_3D', 'WINDOW', 'VIEW_3D')
-
-  if space is not None:
-    # 選択中の頂点のローカル座標を取得する
-    obj = bpy.context.active_object
-    bm = bmesh.from_edit_mesh(obj.data)
-    vert_local = [
-      Vector((v.co[0], v.co[1], v.co[2], 1.0))
-      for v in bm.verts if v.select
-    ]
-    # ローカル座標からグローバル座標への変換
-    vert_global = [obj.matrix_world @ v for v in vert_local]
-
-    # 3次元座標のベクター形式に変換
-    vs = [
-      Vector((v[0], v[1], v[2]))
-      for v in vert_global
-    ]
-
-
-  print("=====================")
-  camera = bpy.data.objects['Camera']  # or bpy.context.active_object
-  render = bpy.context.scene.render
-
-
-
-  for P in vs:
-    print(P)
-    #P = Vector((-0.002170146, 0.409979939, 0.162410125))
-
-    print("Projecting point {} for camera '{:s}' into resolution {:d}x{:d}..."
-        .format(P, camera.name, render.resolution_x, render.resolution_y))
-
-    proj_p = project_3d_point(camera=camera, p=P, render=render)
-    print("Projected point (homogeneous coords): {}.".format(proj_p))
-
-    proj_p_pixels = Vector(((render.resolution_x-1) * (proj_p.x + 1) / 2, (render.resolution_y - 1) * (proj_p.y - 1) / (-2)))
-    print("Projected point (pixel coords): {}.".format(proj_p_pixels))
-
-  print("Done.")
+  get_2D_LeftTopRightBottom(obj)
 
 #  bpy.context.scene.render.image_settings.file_format = 'PNG'
 #  bpy.ops.render.render()
 #  bpy.data.images['Render Result'].save_render( filepath = 'hoge.png')
-
-
-
-
-if __name__ == "__main__":
-  delete_all()
-
-  main()
-
-
