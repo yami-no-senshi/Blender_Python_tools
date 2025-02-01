@@ -1,6 +1,8 @@
 import bpy
 import bmesh
 from mathutils import Vector
+import pip
+print(pip.__path__)
 
 # https://atu-1.gitbooks.io/mirror-introduction/content/body/chapter_03/09_Use_Coordinate_Transformation_2.html
 # https://blender.stackexchange.com/questions/284222/get-view-and-perspective-matrices-of-the-current-3d-viewport-not-camera
