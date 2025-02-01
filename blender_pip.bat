@@ -23,6 +23,9 @@ rem call "%BLENDER_PYTHON%\python.exe" -m pip install simpy --no-warn-script-loc
 rem call "%BLENDER_PYTHON%\python.exe" -m pip install sympy --no-warn-script-location
 rem call %BLENDER_PYTHON%\python.exe -m pip list
 
+call "%BLENDER_PYTHON%\python.exe" -m pip install pillow -t "C:\\Program Files\\Blender Foundation\\Blender 4.3\\4.3\\python\\Lib\\site-packages"
+
+
 echo %BLENDER_PATH%\blender.exe
 
 rem call "%BLENDER_PATH%\blender.exe" -b -P blender_test.py
